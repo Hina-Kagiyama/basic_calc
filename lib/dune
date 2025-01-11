@@ -17,3 +17,17 @@
  (libraries common sedlex)
  (preprocess
   (pps sedlex.ppx ppx_sexp_conv)))
+
+(library
+ (name primitives)
+ (modules Primitives)
+ (libraries common expr))
+
+(menhir
+ (modules parser)
+ (flags --dump --external-tokens Lexer.Tok))
+
+(library
+ (name parser)
+ (modules parser)
+ (libraries common expr lexer menhirLib))

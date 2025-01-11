@@ -1,22 +1,3 @@
-(*
-Abstract syntax:
-
-expr ::= expr "+" expr
-       | expr "-" expr
-       | expr "*" expr
-       | expr "/" expr
-       | expr "^" expr
-       | "+" expr
-       | "-" expr
-       | expr expr
-       | "(" expr ")"
-       | "(" expr "," exprList ")"
-       | ident
-       | real_lit
-exprList ::= expr
-           | exprList "," exprList
- *)
-
 module AST = struct
   open Common.Defs
   open Sexplib0.Sexp_conv
@@ -33,21 +14,25 @@ module AST = struct
     | Arg
   [@@deriving sexp_of]
 
-  let to_string t = t |> sexp_of_exp |> Sexplib0.Sexp.to_string
-end
-
-module Env = struct
-  open Common.Defs
-  open Sexplib0.Sexp_conv
-  module Tbl = Hashtbl.Make (String)
-
-  type value =
+  and value =
     | Undefined
     | None
     | NumVal of num
-    | FunVal of AST.exp
+    | FunVal of exp
+    | PrimVal of (value -> value)
     | TupleVal of value list
   [@@deriving sexp_of]
+
+  type program = Program of exp list
+
+  let to_string t = t |> sexp_of_exp |> Sexplib0.Sexp.to_string
+  let to_human_readable t = t |> sexp_of_exp |> Sexplib0.Sexp.to_string_hum
+  let val_to_string v = v |> sexp_of_value |> Sexplib0.Sexp.to_string
+end
+
+module Env = struct
+  open AST
+  module Tbl = Hashtbl.Make (String)
 
   type env = { arg : value; tbl : value Tbl.t }
 
@@ -55,7 +40,6 @@ module Env = struct
   let set (e : env) = Tbl.add e.tbl
   let call (e : env) v = { arg = v; tbl = Tbl.copy e.tbl }
   let get_arg (e : env) = e.arg
-  let val_to_string v = v |> sexp_of_value |> Sexplib0.Sexp.to_string
 end
 
 module Eval = struct
@@ -76,13 +60,16 @@ module Eval = struct
     | TupleExp l -> TupleVal (l |> List.map (eval env))
     | AppExp (fexp, farg) -> (
         match eval env fexp with
+        | PrimVal prim ->
+            let farg = eval env farg in
+            prim farg
         | FunVal fexp ->
             let farg = eval env farg in
             eval (Env.call env farg) fexp
         | v ->
             Printf.printf
               "[Warning: Value %s from Expression %s not applicatable!]\n"
-              (Env.val_to_string v) (to_string fexp);
+              (val_to_string v) (to_string fexp);
             Undefined)
     | SelExp (texp, k) -> (
         match eval env texp with
@@ -90,7 +77,7 @@ module Eval = struct
         | v ->
             Printf.printf
               "[Warning: Value %s from Expression %s not indexable!]\n"
-              (Env.val_to_string v) (to_string texp);
+              (val_to_string v) (to_string texp);
             Undefined)
     | SetExp (id, vexp) ->
         let vexp = eval env vexp in
@@ -102,7 +89,7 @@ module Eval = struct
         | v ->
             Printf.printf
               "[Warning: Value %s from Expression %s not discardable!]\n"
-              (Env.val_to_string v) (to_string a);
+              (val_to_string v) (to_string a);
             Undefined)
     | LamExp (id, bexp) ->
         let rec rewrite = function
@@ -118,9 +105,16 @@ module Eval = struct
         FunVal (rewrite bexp)
     | Arg -> Env.get_arg env
 
-  let toplevel (arg : value) (explst : exp list) : unit =
+  let toplevel (preload : (id * (value -> value)) list) (arg : value)
+      (prog : program) : unit =
     let env = Env.{ arg; tbl = Tbl.create 255 } in
-    explst
+    let (Program prog) = prog in
+    preload
+    |> List.iter (fun (name, prim) -> Tbl.add env.tbl name (PrimVal prim));
+    prog
     |> List.iter (fun e ->
-           eval env e |> Env.val_to_string |> Printf.printf "=> %s\n")
+           eval env e |> val_to_string |> Printf.printf "=> %s\n")
+
+  let dump (Program p) =
+    p |> List.iter (fun x -> x |> to_human_readable |> print_endline)
 end

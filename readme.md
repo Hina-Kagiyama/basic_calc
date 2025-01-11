@@ -30,7 +30,7 @@ expr ::= expr "+" expr
        | expr "/" expr
        | expr "^" expr
        | ident "->" expr
-       | ident ":=" expr ";" expr
+       | ident ":=" expr
        | expr selector
        | expr ";" expr
        | "+" expr
