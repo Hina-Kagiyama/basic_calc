@@ -50,6 +50,8 @@ let program := l = separated_list (Teol, exp); Teof; { l }
 let repl_expression :=
     | a = exp; Teof; { a }
     | a = exp; Teol; { a }
+    | a = exp; ";"; Teof; { Silence a }
+    | a = exp; ";"; Teol; { Silence a }
 
 let snl(a, b) == separated_nonempty_list(a, b)
 
@@ -77,6 +79,7 @@ let exp :=
 
 let prim_exp :=
     | a = Tid; { VarExp a }
+    | "("; ")"; { VarExp "_" }
     | "("; a = exp; ")"; { a }
     | "("; a = exp; ","; l = separated_list(",", exp); ")"; { TupleExp (a :: l) }
     | a = Tnum; { NumExp a }

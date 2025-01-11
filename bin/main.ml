@@ -31,6 +31,6 @@ let () =
         Printf.printf "Lexing error! UnBalanced Parentheses at position: ";
         report_pos lexbuf;
         repl ()
-    | Exit -> print_newline ()
+    | Exit -> ()
   in
   repl ()

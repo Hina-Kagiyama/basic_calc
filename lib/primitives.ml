@@ -73,5 +73,9 @@ module Prim = struct
       ("asinh", numOp1 "asinh" asinh);
       ("acosh", numOp1 "acosh" acosh);
       ("atanh", numOp1 "atanh" atanh);
+      ( "print",
+        fun v ->
+          val_to_string v |> print_endline;
+          None );
     ]
 end

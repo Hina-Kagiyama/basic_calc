@@ -12,6 +12,7 @@ module AST = struct
     | TupleExp of exp list
     | CondExp of (exp * exp) list
     | VarExp of id
+    | Silence of exp
   [@@deriving sexp_of]
 
   and value =
@@ -21,6 +22,7 @@ module AST = struct
     | PrimVal of (value -> value)
     | TupleVal of value list
     | Undefined
+    | Quiet of value
   [@@deriving sexp_of]
 
   type program = exp list
@@ -40,6 +42,7 @@ module AST = struct
           |> String.concat "|")
         ^ ")"
     | VarExp a -> a
+    | Silence _ -> ""
 
   let to_human_readable t = t |> sexp_of_exp |> Sexplib0.Sexp.to_string_hum
 
@@ -51,6 +54,7 @@ module AST = struct
     | TupleVal l ->
         "(" ^ (l |> List.map val_to_string |> String.concat ",") ^ ")"
     | Undefined -> "[Undefined]"
+    | Quiet _ -> ""
 end
 
 module Env = struct
@@ -108,6 +112,7 @@ module Patch = struct
         AppExp (VarExp "+", TupleExp (NumExp (a +. b) :: l)) |> patch
     | AppExp (VarExp "-", TupleExp (NumExp a :: NumExp b :: l)) ->
         AppExp (VarExp "-", TupleExp (NumExp (a +. b) :: l)) |> patch
+    | Silence q -> Silence (patch q)
     | q -> q
 end
 
@@ -128,6 +133,7 @@ module Eval = struct
       | LamExp (i, _) as a when i = id -> a
       | LamExp (i, e) -> LamExp (i, aux e)
       | CondExp l -> CondExp (List.map (fun (a, b) -> (aux a, aux b)) l)
+      | Silence q -> Silence (aux q)
     in
     aux
 
@@ -185,6 +191,7 @@ module Eval = struct
           | (a, b) :: l -> if eval env a = None then eval env b else switch l
         in
         switch l
+    | Silence q -> Quiet (eval env q)
 
   let make_env (preload : (id * (value -> value)) list) (arg : value) : Env.env
       =
@@ -196,11 +203,11 @@ module Eval = struct
   let script (env : Env.env) (prog : program) : unit =
     prog
     |> List.iter (fun e ->
-           e |> Patch.patch |> eval env |> val_to_string
-           |> Printf.printf "=> %s\n")
+           e |> Patch.patch |> eval env |> val_to_string |> Printf.printf "%s\n")
 
   let repl (env : Env.env) (e : exp) : unit =
-    e |> Patch.patch |> eval env |> val_to_string |> Printf.printf "%s\n"
+    e |> Patch.patch |> eval env |> val_to_string |> fun s ->
+    if s <> "" then Printf.printf "%s\n" s else ()
 
   let dump x = x |> to_human_readable |> print_endline
   let dumpl p = p |> List.iter dump
