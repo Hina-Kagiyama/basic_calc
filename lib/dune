@@ -1,0 +1,19 @@
+(library
+ (name common)
+ (modules Common)
+ (preprocess
+  (pps ppx_sexp_conv)))
+
+(library
+ (name expr)
+ (modules Expr)
+ (preprocess
+  (pps ppx_sexp_conv))
+ (libraries common))
+
+(library
+ (name lexer)
+ (modules Lexer)
+ (libraries common sedlex)
+ (preprocess
+  (pps sedlex.ppx ppx_sexp_conv)))

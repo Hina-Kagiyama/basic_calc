@@ -1,0 +1,4 @@
+(executable
+ (public_name bc)
+ (name main)
+ (libraries common expr lexer sedlex))
