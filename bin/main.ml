@@ -15,9 +15,12 @@ let () =
   in
   let env = Eval.make_env Prim.primitives AST.Undefined in
   let rec repl () =
+    (* print_string "> "; *)
     Out_channel.flush stdout;
     try
-      parseline () |> Eval.repl env;
+      let t = parseline () in
+      (* print_string "= "; *)
+      t |> Eval.repl env;
       repl ()
     with
     | Parser.Error ->
@@ -28,6 +31,6 @@ let () =
         Printf.printf "Lexing error! UnBalanced Parentheses at position: ";
         report_pos lexbuf;
         repl ()
-    | Exit -> Printf.printf "Exiting...\n"
+    | Exit -> print_newline ()
   in
   repl ()

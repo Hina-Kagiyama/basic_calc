@@ -81,6 +81,36 @@ module Env = struct
     Tbl.iter p e
 end
 
+module Patch = struct
+  open AST
+
+  let rec patch e = e |> exp_folding |> partial_eval
+
+  and exp_folding = function
+    | AppExp (VarExp id, TupleExp (AppExp (VarExp id', TupleExp [ a; b ]) :: l))
+      as q
+      when List.mem id [ "+"; "-"; "*"; "/"; "="; "!="; "<"; ">"; "<="; ">=" ]
+      ->
+        if id = id' then AppExp (VarExp id, TupleExp (a :: b :: l)) |> patch
+        else q
+    | q -> q
+
+  and partial_eval = function
+    | LamExp (a, b) -> LamExp (a, patch b)
+    | SeqExp (a, b) -> SeqExp (patch a, patch b)
+    | SetExp (a, b) -> SetExp (a, patch b)
+    | CondExp l -> CondExp (List.map (fun (c, e) -> (patch c, patch e)) l)
+    | TupleExp l -> TupleExp (List.map patch l)
+    | AppExp (f, TupleExp [ a ]) -> AppExp (f, a) |> patch
+    | AppExp (VarExp "+", NumExp a) -> NumExp a
+    | AppExp (VarExp "-", NumExp a) -> NumExp (-.a)
+    | AppExp (VarExp "+", TupleExp (NumExp a :: NumExp b :: l)) ->
+        AppExp (VarExp "+", TupleExp (NumExp (a +. b) :: l)) |> patch
+    | AppExp (VarExp "-", TupleExp (NumExp a :: NumExp b :: l)) ->
+        AppExp (VarExp "-", TupleExp (NumExp (a +. b) :: l)) |> patch
+    | q -> q
+end
+
 module Eval = struct
   open Common.Defs
   open AST
@@ -147,7 +177,7 @@ module Eval = struct
             Printf.printf
               "[Warning: Value %s from Expression %s not discardable!]\n"
               (val_to_string v) (to_string a);
-            Undefined)
+            eval env b)
     | LamExp (id, bexp) -> FunVal (id, bexp)
     | CondExp l ->
         let rec switch = function
@@ -166,10 +196,12 @@ module Eval = struct
   let script (env : Env.env) (prog : program) : unit =
     prog
     |> List.iter (fun e ->
-           eval env e |> val_to_string |> Printf.printf "=> %s\n")
+           e |> Patch.patch |> eval env |> val_to_string
+           |> Printf.printf "=> %s\n")
 
   let repl (env : Env.env) (e : exp) : unit =
-    eval env e |> val_to_string |> Printf.printf "=> %s\n"
+    e |> Patch.patch |> eval env |> val_to_string |> Printf.printf "%s\n"
 
-  let dump p = p |> List.iter (fun x -> x |> to_human_readable |> print_endline)
+  let dump x = x |> to_human_readable |> print_endline
+  let dumpl p = p |> List.iter dump
 end

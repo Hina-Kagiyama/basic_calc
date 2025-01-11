@@ -30,8 +30,8 @@
 
 %left ";"
 %left ":="
-%left "=" "!=" "<" ">" "<=" ">="
 %left "->"
+%left "=" "!=" "<" ">" "<=" ">="
 %left "+" "-"
 %left "*" "/"
 %right POS NEG
